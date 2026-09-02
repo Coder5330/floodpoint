@@ -42,9 +42,10 @@ export interface ValidClassCode {
  * Payload for SendJoinClass event
  */
 export interface SendJoinClassPayload {
-  isInSlideshow: boolean;
+  [key: string]: unknown;
+  isInSlideshow?: boolean;
   presenterName?: string;
-  className?: string;
+  schoolName?: string;
 }
 
 /**
