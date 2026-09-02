@@ -19,7 +19,11 @@ function resolveSchoolName(email: string, school?: string): string {
   if (school && school.trim() !== "") return school.trim();
   if (!email || !email.includes("@")) return "Unknown Institution";
 
-  const domain = email.split("@")[1].toLowerCase();
+  const parts = email.split("@");
+  const domain = parts[1]?.toLowerCase();
+
+  if (!domain) return "Unknown Institution";
+
   if (["gmail.com", "yahoo.com", "hotmail.com", "outlook.com"].includes(domain)) {
     return "Personal Account";
   }
