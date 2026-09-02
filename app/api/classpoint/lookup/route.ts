@@ -1,12 +1,13 @@
 // app/api/classpoint/lookup/route.ts - Look up class code information with rate limiting
 
 import { NextResponse } from "next/server";
-import { lookupClassCode, lookupSchool } from "@/src/lib/classpoint"; 
+import { lookupClassCode, lookupSchool } from "@/src/lib/classpoint";
 import { lookupRateLimiter, getClientId, rateLimitResponse, createRateLimitHeaders } from "@/src/lib/rate-limit";
 import { validateClassCode } from "@/src/config";
 
 export async function GET(request: Request): Promise<Response> {
   try {
+    // Rate limiting check
     const clientId = getClientId(request);
     const rateCheck = lookupRateLimiter.check(clientId);
 
@@ -18,6 +19,7 @@ export async function GET(request: Request): Promise<Response> {
     const classCode = searchParams.get("code");
     const mode = (searchParams.get("mode") || "guest") as "guest" | "restricted";
 
+    // Use centralized validation with mode
     const validation = validateClassCode(classCode || "", mode);
     if (!validation.valid) {
       return NextResponse.json(
@@ -26,6 +28,7 @@ export async function GET(request: Request): Promise<Response> {
       );
     }
 
+    // Safe extraction after validation
     const validatedCode = classCode!.trim();
 
     const classInfo = await lookupClassCode(validatedCode);
@@ -38,7 +41,6 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     let schoolInfo = null;
-    
     if (classInfo.schoolId) {
       schoolInfo = await lookupSchool(classInfo.schoolId);
     }
@@ -48,6 +50,7 @@ export async function GET(request: Request): Promise<Response> {
       school: schoolInfo
     };
 
+    // Return with Cache-Control headers to prevent stale session info
     return NextResponse.json(responseData, {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
