@@ -48,6 +48,7 @@ interface Candidate {
   presenterEmail: string;
   cpcsRegion: string;
   school?: string;
+  teacherName?: string;
 }
 
 interface SessionScannerState {
@@ -536,6 +537,7 @@ async function checkCode(code: number): Promise<Candidate | null> {
     discoveryStats.ok++;
     negativeSignalDetector.recordSuccess();
     const data = response.data;
+
     if (data.presenterEmail && data.cpcsRegion) {
       logDiscoveryStats();
 
@@ -543,14 +545,29 @@ async function checkCode(code: number): Promise<Candidate | null> {
         data.schoolName || 
         data.school || 
         data.organizationName || 
-        data.organization?.name ||
+        data.organization ||
+        data.institutionName ||
+        data.institution ||
+        data.presenterSchool ||
+        data.userSchool ||
+        data.profile?.schoolName ||
+        undefined;
+
+      const teacherName =
+        data.presenterName ||
+        data.teacherName ||
+        data.displayName ||
+        data.name ||
+        data.presenter ||
+        data.profile?.displayName ||
         undefined;
 
       return { 
         code, 
         presenterEmail: data.presenterEmail, 
         cpcsRegion: data.cpcsRegion,
-        school: schoolName ? String(schoolName).trim() : undefined
+        school: schoolName ? String(schoolName).trim() : undefined,
+        teacherName: teacherName ? String(teacherName).trim() : undefined,
       };
     }
     discoveryStats.invalidData++;
@@ -766,9 +783,10 @@ export async function startScanIfNotRunning(
               code: candidate.code,
               email: candidate.presenterEmail,
               school: candidate.school,
+              teacherName: candidate.teacherName,
               foundAt: new Date(),
             } as ValidClassCode);
-            logger.info(`✓ Confirmed: ${candidate.code} (${candidate.presenterEmail})`);
+            logger.info(`✓ Confirmed: ${candidate.code} (${candidate.teacherName || candidate.presenterEmail})`);
           }
         }
       );
