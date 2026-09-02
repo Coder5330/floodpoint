@@ -53,6 +53,14 @@ export function ScanResultsList({ results }: ScanResultsListProps) {
                 <p className="text-xs text-muted-foreground truncate mt-0.5">
                   {item.email}
                 </p>
+                {/* Dynamically checks for school string or object name */}
+                {(item as any).school && (
+                  <p className="text-xs text-muted-foreground/75 truncate mt-0.5">
+                    {typeof (item as any).school === "string" 
+                      ? (item as any).school 
+                      : (item as any).school.name}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => handleCopy(item.code)}
