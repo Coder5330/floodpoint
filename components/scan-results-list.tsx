@@ -1,11 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, User } from "lucide-react";
+import { Copy, Check, GraduationCap } from "lucide-react";
 import type { ValidClassCode } from "@/src/types";
 
 interface ScanResultsListProps {
   results: ValidClassCode[];
+}
+
+const PERSONAL_DOMAINS = new Set([
+  "gmail.com",
+  "yahoo.com",
+  "hotmail.com",
+  "outlook.com",
+  "icloud.com",
+]);
+
+function getDomainDisplay(email: string): string {
+  if (!email || !email.includes("@")) return "UNKNOWN";
+  const domain = email.split("@")[1]?.toLowerCase().trim();
+  if (!domain) return "UNKNOWN";
+  if (PERSONAL_DOMAINS.has(domain)) return "Personal Account";
+  return domain.toUpperCase();
 }
 
 export function ScanResultsList({ results }: ScanResultsListProps) {
@@ -28,8 +44,7 @@ export function ScanResultsList({ results }: ScanResultsListProps) {
   return (
     <div className="divide-y divide-white/5 rounded-lg border border-white/10 bg-[#0B0F17] text-white shadow-sm overflow-hidden">
       {results.map((result) => {
-        // Display extracted teacher name, or fallback to full email
-        const teacherDisplay = result.teacherName || result.email || "Unknown Teacher";
+        const domainText = getDomainDisplay(result.email);
         const isCopied = copiedCode === result.code;
 
         return (
@@ -42,11 +57,9 @@ export function ScanResultsList({ results }: ScanResultsListProps) {
                 {result.code}
               </span>
 
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <User className="h-4 w-4 shrink-0 text-slate-500" />
-                <span className="tracking-wide text-slate-300 font-medium">
-                  {teacherDisplay}
-                </span>
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#3B82F6]">
+                <GraduationCap className="h-4 w-4 shrink-0" />
+                <span className="tracking-wide">{domainText}</span>
               </div>
             </div>
 
