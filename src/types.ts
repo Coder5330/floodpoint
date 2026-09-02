@@ -33,6 +33,7 @@ export interface ClassCodeResponse {
 export interface ValidClassCode {
   code: number;
   email: string;
+  school?: string;
   foundAt: Date;
 }
 
