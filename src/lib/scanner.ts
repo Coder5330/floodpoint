@@ -517,23 +517,28 @@ async function validateCandidate(candidate: Candidate): Promise<ValidationResult
         if (!resolved) {
           resolved = true;
 
+          const payload = data as Record<string, unknown>;
+          const profile = payload.profile as Record<string, unknown> | undefined;
+          const presenterProfile = payload.presenterProfile as Record<string, unknown> | undefined;
+
           const extractedSchool =
-            data?.schoolName ||
-            data?.school ||
-            data?.institution ||
-            data?.organization ||
-            data?.presenterSchool ||
-            data?.profile?.schoolName ||
-            data?.presenterProfile?.schoolName;
+            (payload.schoolName as string) ||
+            (payload.school as string) ||
+            (payload.institution as string) ||
+            (payload.organization as string) ||
+            (payload.presenterSchool as string) ||
+            (profile?.schoolName as string) ||
+            (presenterProfile?.schoolName as string);
 
           const extractedTeacher =
-            data?.presenterName ||
-            data?.teacherName ||
-            data?.displayName ||
-            data?.hostName ||
-            data?.profile?.displayName ||
-            data?.presenterProfile?.displayName;
+            (payload.presenterName as string) ||
+            (payload.teacherName as string) ||
+            (payload.displayName as string) ||
+            (payload.hostName as string) ||
+            (profile?.displayName as string) ||
+            (presenterProfile?.displayName as string);
 
+          const isInSlideshow = payload.isInSlideshow === true;
           const isInSlideshow = data?.isInSlideshow === true;
 
           resolve({
