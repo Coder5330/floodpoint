@@ -5,6 +5,7 @@ import { API_ENDPOINTS } from "../config";
 export interface ClassInfo {
   presenterEmail: string;
   cpcsRegion: string;
+  school?: string; // Added school to the interface
 }
 
 /**
@@ -51,9 +52,18 @@ export async function lookupClassCode(classCode: string | number): Promise<Class
       return null;
     }
 
+    // Try to extract school from common ClassPoint API fields
+    const schoolName = 
+      data.schoolName || 
+      data.school || 
+      data.organizationName || 
+      data.organization?.name ||
+      undefined;
+
     return {
       presenterEmail: data.presenterEmail.trim(),
       cpcsRegion: data.cpcsRegion.trim(),
+      school: schoolName ? String(schoolName).trim() : undefined, // Include school in the return
     };
   } catch (error) {
     if (error instanceof Error) {
