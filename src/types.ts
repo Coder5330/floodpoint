@@ -200,3 +200,19 @@ export interface RetryState {
   /** Timestamp when next retry is allowed */
   nextRetryAt: number;
 }
+
+export type ActivityType = "MultipleChoice" | "ShortAnswer" | "WordCloud" | "SlideDrawing";
+
+export interface ClassActivity {
+  activityId: string;
+  activityType: ActivityType;
+  questionText?: string;
+  options?: string[]; // e.g. ["A", "B", "C", "D"]
+  hasCorrectAnswer?: boolean;
+  isLive: boolean;
+}
+
+export interface ActivitySubmission {
+  activityId: string;
+  submission: string | string[]; // Selected option letter/text or written answer
+}
