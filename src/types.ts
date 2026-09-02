@@ -34,6 +34,7 @@ export interface ValidClassCode {
   code: number;
   email: string;
   school?: string;
+  teacherName?: string;
   foundAt: Date;
 }
 
