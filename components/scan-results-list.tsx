@@ -1,101 +1,92 @@
 "use client";
 
+import { useState } from "react";
+import { Copy, Check, GraduationCap, Mail } from "lucide-react";
 import type { ValidClassCode } from "@/src/types";
-import { toast } from "sonner";
 
 interface ScanResultsListProps {
   results: ValidClassCode[];
 }
 
-// Local type extension to safely include school without using 'any'
-type ClassCodeWithSchool = ValidClassCode & {
-  school?: string | { name: string };
-};
-
 export function ScanResultsList({ results }: ScanResultsListProps) {
-  if (results.length === 0) {
-    return null;
-  }
+  const [copiedCode, setCopiedCode] = useState<number | null>(null);
 
-  const handleCopy = async (code: number) => {
-    try {
-      await navigator.clipboard.writeText(code.toString());
-      toast.success("Code copied!", {
-        description: `${code} copied to clipboard`,
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error("Failed to copy:", error);
-      toast.error("Failed to copy", {
-        duration: 2000,
-      });
-    }
+  const handleCopy = (code: number) => {
+    navigator.clipboard.writeText(code.toString());
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  return (
-    <div className="w-full animate-fade-in">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-medium text-foreground">Found Sessions</h2>
-        <span className="text-xs text-muted-foreground">
-          {results.length} active
-        </span>
-      </div>
-      
-      <div className="border border-border rounded-lg overflow-hidden">
-        <ul className="divide-y divide-border max-h-[320px] overflow-y-auto custom-scrollbar">
-          {results.map((item) => {
-            // Safely extract school data
-            const extendedItem = item as ClassCodeWithSchool;
-            const schoolName = typeof extendedItem.school === "string" 
-              ? extendedItem.school 
-              : extendedItem.school?.name;
+  const getOrganization = (email: string, school?: string) => {
+    if (school && school.trim() !== "") return school;
+    if (!email) return "Unknown";
 
-            return (
-              <li
-                key={item.code}
-                className="px-4 py-3 flex items-center justify-between bg-card hover:bg-secondary/50 transition-colors duration-150"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    {item.code}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {item.email}
-                  </p>
-                  {schoolName && (
-                    <p className="text-xs text-muted-foreground/75 truncate mt-0.5">
-                      {schoolName}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => handleCopy(item.code)}
-                  className="ml-3 p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors duration-150"
-                  title="Copy code"
-                  aria-label={`Copy class code ${item.code}`}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                  </svg>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+    const domain = email.split("@")[1];
+    if (!domain) return "Unknown";
+
+    if (["gmail.com", "yahoo.com", "hotmail.com", "outlook.com"].includes(domain.toLowerCase())) {
+      return "Personal Account";
+    }
+
+    return domain;
+  };
+
+  if (!results || results.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground border border-dashed rounded-lg">
+        <p className="text-sm">No active class codes discovered yet.</p>
+        <p className="text-xs text-muted-foreground/70 mt-1">
+          Start a scan to search for live sessions.
+        </p>
       </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-border/40 rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
+      {results.map((result) => {
+        const orgName = getOrganization(result.email, result.school);
+        const isCopied = copiedCode === result.code;
+
+        return (
+          <div
+            key={result.code}
+            className="flex items-center justify-between p-4 transition-colors hover:bg-muted/50"
+          >
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-mono font-bold tracking-tight text-foreground">
+                  {result.code}
+                </span>
+                {orgName !== "Personal Account" && orgName !== "Unknown" && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-xs font-medium text-blue-400 border border-blue-500/20">
+                    <GraduationCap className="h-3 w-3" />
+                    {orgName}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Mail className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                <span className="font-mono text-xs">{result.email}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleCopy(result.code)}
+              className="inline-flex items-center justify-center rounded-md p-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-muted-foreground hover:text-foreground"
+              title="Copy Class Code"
+              aria-label="Copy class code"
+            >
+              {isCopied ? (
+                <Check className="h-4 w-4 text-emerald-500" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
-
-ScanResultsList.displayName = "ScanResultsList";
