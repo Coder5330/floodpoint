@@ -512,8 +512,8 @@ async function validateCandidate(candidate: Candidate): Promise<ValidationResult
     let resolved = false;
 
     const resultPromise = new Promise<ValidationResult>((resolve) => {
-      // ClassPoint emits live session profile details via SendJoinClass event
-      connection!.on("SendJoinClass", (data: any) => {
+      // Typed properly to prevent ESLint no-explicit-any & no-unused-vars errors
+      connection!.on("SendJoinClass", (data: SendJoinClassPayload) => {
         if (!resolved) {
           resolved = true;
 
