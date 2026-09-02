@@ -7,9 +7,11 @@ interface ScanResultsListProps {
   results: ValidClassCode[];
 }
 
-/**
- * Clean scan results list with copy feedback
- */
+// Local type extension to safely include school without using 'any'
+type ClassCodeWithSchool = ValidClassCode & {
+  school?: string | { name: string };
+};
+
 export function ScanResultsList({ results }: ScanResultsListProps) {
   if (results.length === 0) {
     return null;
@@ -41,50 +43,55 @@ export function ScanResultsList({ results }: ScanResultsListProps) {
       
       <div className="border border-border rounded-lg overflow-hidden">
         <ul className="divide-y divide-border max-h-[320px] overflow-y-auto custom-scrollbar">
-          {results.map((item) => (
-            <li
-              key={item.code}
-              className="px-4 py-3 flex items-center justify-between bg-card hover:bg-secondary/50 transition-colors duration-150"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">
-                  {item.code}
-                </p>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {item.email}
-                </p>
-                {/* Dynamically checks for school string or object name */}
-                {(item as any).school && (
-                  <p className="text-xs text-muted-foreground/75 truncate mt-0.5">
-                    {typeof (item as any).school === "string" 
-                      ? (item as any).school 
-                      : (item as any).school.name}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => handleCopy(item.code)}
-                className="ml-3 p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors duration-150"
-                title="Copy code"
-                aria-label={`Copy class code ${item.code}`}
+          {results.map((item) => {
+            // Safely extract school data
+            const extendedItem = item as ClassCodeWithSchool;
+            const schoolName = typeof extendedItem.school === "string" 
+              ? extendedItem.school 
+              : extendedItem.school?.name;
+
+            return (
+              <li
+                key={item.code}
+                className="px-4 py-3 flex items-center justify-between bg-card hover:bg-secondary/50 transition-colors duration-150"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {item.code}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {item.email}
+                  </p>
+                  {schoolName && (
+                    <p className="text-xs text-muted-foreground/75 truncate mt-0.5">
+                      {schoolName}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleCopy(item.code)}
+                  className="ml-3 p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors duration-150"
+                  title="Copy code"
+                  aria-label={`Copy class code ${item.code}`}
                 >
-                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                </svg>
-              </button>
-            </li>
-          ))}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                  </svg>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>
