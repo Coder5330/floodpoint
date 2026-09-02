@@ -1,7 +1,7 @@
 // app/api/classpoint/lookup/route.ts - Look up class code information with rate limiting
 
 import { NextResponse } from "next/server";
-import { lookupClassCode, lookupSchool } from "@/src/lib/classpoint";
+import { lookupClassCode } from "@/src/lib/classpoint";
 import { lookupRateLimiter, getClientId, rateLimitResponse, createRateLimitHeaders } from "@/src/lib/rate-limit";
 import { validateClassCode } from "@/src/config";
 
@@ -40,18 +40,8 @@ export async function GET(request: Request): Promise<Response> {
       );
     }
 
-    let schoolInfo = null;
-    if (classInfo.schoolId) {
-      schoolInfo = await lookupSchool(classInfo.schoolId);
-    }
-
-    const responseData = {
-      ...classInfo,
-      school: schoolInfo
-    };
-
     // Return with Cache-Control headers to prevent stale session info
-    return NextResponse.json(responseData, {
+    return NextResponse.json(classInfo, {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
         "Pragma": "no-cache",
