@@ -1,34 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, GraduationCap, User } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import type { ValidClassCode } from "@/src/types";
 
 interface ScanResultsListProps {
   results: ValidClassCode[];
-}
-
-const KNOWN_DOMAINS: Record<string, string> = {
-  "mfu.ac.th": "Mae Fah Luang University",
-  "moe.edu.sg": "Ministry of Education (Singapore)",
-  "nus.edu.sg": "National University of Singapore",
-  "ntu.edu.sg": "Nanyang Technological University",
-};
-
-function resolveSchoolName(email: string, school?: string): string {
-  if (school && school.trim() !== "") return school.trim();
-  if (!email || !email.includes("@")) return "Unknown Institution";
-
-  const parts = email.split("@");
-  const domain = parts[1]?.toLowerCase();
-
-  if (!domain) return "Unknown Institution";
-
-  if (["gmail.com", "yahoo.com", "hotmail.com", "outlook.com"].includes(domain)) {
-    return "Personal Account";
-  }
-
-  return KNOWN_DOMAINS[domain] || domain.toUpperCase();
 }
 
 export function ScanResultsList({ results }: ScanResultsListProps) {
@@ -54,7 +31,6 @@ export function ScanResultsList({ results }: ScanResultsListProps) {
   return (
     <div className="divide-y divide-border/40 rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
       {results.map((result) => {
-        const schoolName = resolveSchoolName(result.email, result.school);
         const isCopied = copiedCode === result.code;
 
         return (
@@ -62,21 +38,17 @@ export function ScanResultsList({ results }: ScanResultsListProps) {
             key={result.code}
             className="flex items-center justify-between p-4 transition-colors hover:bg-muted/50"
           >
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <span className="text-2xl font-mono font-bold tracking-tight text-foreground block">
                 {result.code}
               </span>
-
-              {result.teacherName && (
-                <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                  <User className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span>{result.teacherName}</span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <GraduationCap className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-                <span className="text-blue-400 font-medium">{schoolName}</span>
+              
+              <div className="text-sm text-muted-foreground font-mono">
+                {result.teacherName ? (
+                  <span>{result.teacherName} ({result.email})</span>
+                ) : (
+                  <span>{result.email}</span>
+                )}
               </div>
             </div>
 
