@@ -8,20 +8,21 @@ interface ScanResultsListProps {
   results: ValidClassCode[];
 }
 
-function getSchoolDisplay(email: string, school?: string): string {
-  // 1. Real school name fetched via SignalR bot
-  if (school && school.trim() !== "") {
-    return school.trim();
-  }
+const PERSONAL_DOMAINS = new Set([
+  "gmail.com",
+  "yahoo.com",
+  "hotmail.com",
+  "outlook.com",
+  "icloud.com",
+]);
 
-  // 2. Domain fallback logic
-  if (!email || !email.includes("@")) return "Unknown Institution";
+function getDomainDisplay(email: string): string {
+  if (!email || !email.includes("@")) return "UNKNOWN";
 
-  const parts = email.split("@");
-  const domain = parts[1]?.toLowerCase();
-  if (!domain) return "Unknown Institution";
+  const domain = email.split("@")[1]?.toLowerCase().trim();
+  if (!domain) return "UNKNOWN";
 
-  if (["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com"].includes(domain)) {
+  if (PERSONAL_DOMAINS.has(domain)) {
     return "Personal Account";
   }
 
@@ -41,43 +42,40 @@ export function ScanResultsList({ results }: ScanResultsListProps) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground border border-dashed rounded-lg">
         <p className="text-sm">No active class codes discovered yet.</p>
-        <p className="text-xs text-muted-foreground/70 mt-1">
-          Start a scan to search for live sessions.
-        </p>
       </div>
     );
   }
 
   return (
-    <div className="divide-y divide-border/40 rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
+    <div className="divide-y divide-white/5 rounded-lg border border-white/10 bg-[#0B0F17] text-white shadow-sm overflow-hidden">
       {results.map((result) => {
-        const schoolDisplay = getSchoolDisplay(result.email, result.school);
+        const domainText = getDomainDisplay(result.email);
         const isCopied = copiedCode === result.code;
 
         return (
           <div
             key={result.code}
-            className="flex items-center justify-between p-4 transition-colors hover:bg-muted/50"
+            className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-white/[0.02]"
           >
             <div className="space-y-1">
-              <span className="text-2xl font-mono font-bold tracking-tight text-foreground block">
+              <span className="text-2xl font-bold tracking-tight text-white block font-mono">
                 {result.code}
               </span>
 
-              <div className="flex items-center gap-1.5 text-xs text-blue-400 font-medium">
-                <GraduationCap className="h-3.5 w-3.5 shrink-0" />
-                <span>{schoolDisplay}</span>
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#3B82F6]">
+                <GraduationCap className="h-4 w-4 shrink-0" />
+                <span className="tracking-wide">{domainText}</span>
               </div>
             </div>
 
             <button
               onClick={() => handleCopy(result.code)}
-              className="inline-flex items-center justify-center rounded-md p-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-muted-foreground hover:text-foreground"
+              className="p-2 text-slate-400 hover:text-white transition-colors rounded-md"
               title="Copy Class Code"
               aria-label="Copy class code"
             >
               {isCopied ? (
-                <Check className="h-5 w-5 text-emerald-500" />
+                <Check className="h-5 w-5 text-emerald-400" />
               ) : (
                 <Copy className="h-5 w-5" />
               )}
