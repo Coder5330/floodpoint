@@ -1,11 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, GraduationCap } from "lucide-react";
 import type { ValidClassCode } from "@/src/types";
 
 interface ScanResultsListProps {
   results: ValidClassCode[];
+}
+
+/**
+ * Dynamically extracts readable institution labels from raw input
+ * without relying on static hardcoded lookup maps.
+ */
+function getDynamicSchoolName(email: string, school?: string): string {
+  if (school && school.trim() !== "") return school.trim();
+  if (!email || !email.includes("@")) return "Unknown Institution";
+
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (!domain) return "Unknown Institution";
+
+  if (["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com"].includes(domain)) {
+    return "Personal Account";
+  }
+
+  // Dynamic uppercase formatting for organizational domains
+  return domain.toUpperCase();
 }
 
 export function ScanResultsList({ results }: ScanResultsListProps) {
@@ -31,6 +50,7 @@ export function ScanResultsList({ results }: ScanResultsListProps) {
   return (
     <div className="divide-y divide-border/40 rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
       {results.map((result) => {
+        const schoolName = getDynamicSchoolName(result.email, result.school);
         const isCopied = copiedCode === result.code;
 
         return (
@@ -42,13 +62,10 @@ export function ScanResultsList({ results }: ScanResultsListProps) {
               <span className="text-2xl font-mono font-bold tracking-tight text-foreground block">
                 {result.code}
               </span>
-              
-              <div className="text-sm text-muted-foreground font-mono">
-                {result.teacherName ? (
-                  <span>{result.teacherName} ({result.email})</span>
-                ) : (
-                  <span>{result.email}</span>
-                )}
+
+              <div className="flex items-center gap-1.5 text-xs text-blue-400 font-medium">
+                <GraduationCap className="h-3.5 w-3.5 shrink-0" />
+                <span>{schoolName}</span>
               </div>
             </div>
 
