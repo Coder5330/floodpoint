@@ -512,7 +512,6 @@ async function validateCandidate(candidate: Candidate): Promise<ValidationResult
     let resolved = false;
 
     const resultPromise = new Promise<ValidationResult>((resolve) => {
-      // Typed properly to prevent ESLint no-explicit-any & no-unused-vars errors
       connection!.on("SendJoinClass", (data: SendJoinClassPayload) => {
         if (!resolved) {
           resolved = true;
@@ -539,7 +538,6 @@ async function validateCandidate(candidate: Candidate): Promise<ValidationResult
             (presenterProfile?.displayName as string);
 
           const isInSlideshow = payload.isInSlideshow === true;
-          const isInSlideshow = data?.isInSlideshow === true;
 
           resolve({
             isValid: isInSlideshow,
