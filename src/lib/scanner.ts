@@ -47,6 +47,7 @@ interface Candidate {
   code: number;
   presenterEmail: string;
   cpcsRegion: string;
+  school?: string;
 }
 
 interface SessionScannerState {
@@ -189,8 +190,6 @@ async function runPreFlightCheck(): Promise<boolean> {
     const preFlightLatency = Date.now() - start;
     logger.warn(`[Pre-flight] Single request: ${res1.status} (${preFlightLatency}ms)`);
 
-    // Calculate adaptive timeout: 1.5x the pre-flight latency (with optimized agent, less buffer needed)
-    // Cap at 8s to prevent excessive delays even on degraded networks
     const calculatedTimeout = Math.min(preFlightLatency * 1.5, 8000);
     adaptiveTimeout = Math.max(
       SCANNER_CONFIG.DISCOVERY_TIMEOUT,
@@ -216,7 +215,6 @@ async function runPreFlightCheck(): Promise<boolean> {
     const results = await Promise.all(promises);
     logger.warn(`[Pre-flight] Burst results: ${results.join(",")} (${Date.now() - burstStart}ms)`);
 
-    // If all failed, we are blocked
     if (results.every(r => r === "ERR")) {
       logger.error("[Pre-flight] CRITICAL: All burst requests failed. Network connectivity issue suspected.");
       preFlightDone = true;
@@ -224,17 +222,15 @@ async function runPreFlightCheck(): Promise<boolean> {
       return false;
     }
 
-    // Pre-warm connection pool for faster scan startup
     logger.warn("[Pre-flight] Pre-warming connection pool...");
     const warmupStart = Date.now();
     const warmupPromises = [];
 
-    // Pre-warm with ~50 concurrent requests to establish socket pool
     const warmupCodes = Array.from({ length: 50 }, (_, i) => 10100 + i);
     for (const code of warmupCodes) {
       warmupPromises.push(
         scannerClient.get(API_ENDPOINTS.CLASS_CODE_LOOKUP(code))
-          .catch(() => null) // Ignore results, just warming sockets
+          .catch(() => null)
       );
     }
 
@@ -258,8 +254,6 @@ async function runPreFlightCheck(): Promise<boolean> {
   }
 }
 
-
-
 export function getScanProgress(sessionId: string) {
   const session = getSession(sessionId);
   if (!session) {
@@ -280,13 +274,12 @@ export function getScanProgress(sessionId: string) {
     };
   }
 
-  // Determine phase based on state
   let phase: 'discovery' | 'validation' | 'complete' | null = null;
   if (session.scanning) {
     if (session.scannedCount < session.totalCodes) {
-      phase = 'discovery'; // Still discovering (validation runs in parallel)
+      phase = 'discovery';
     } else if (session.validatedCount < session.candidateCount) {
-      phase = 'validation'; // Discovery done, finishing validation
+      phase = 'validation';
     }
   } else if (session.remainingCodes.length === 0 && session.foundCodes.length > 0) {
     phase = 'complete';
@@ -344,12 +337,12 @@ export function disposeScanner(): void {
 }
 
 // ============================================================================
-// Worker Pool - Optimized for high throughput
+// Worker Pool
 // ============================================================================
 
 class WorkerPool<T> {
   private queue: T[] = [];
-  private queueHead = 0; // Track position instead of shifting (O(1) vs O(n))
+  private queueHead = 0;
   private activeCount = 0;
   private readonly concurrency: number;
   private readonly processor: (item: T) => Promise<void>;
@@ -372,7 +365,6 @@ class WorkerPool<T> {
     const wasEmpty = this.queueHead >= this.queue.length;
     this.queue.push(...items);
 
-    // Start workers efficiently - avoid redundant calls
     if (wasEmpty) {
       const workersToStart = Math.min(this.concurrency - this.activeCount, items.length);
       for (let i = 0; i < workersToStart; i++) {
@@ -386,10 +378,9 @@ class WorkerPool<T> {
       return;
     }
 
-    const item = this.queue[this.queueHead++]; // O(1) array access instead of shift
+    const item = this.queue[this.queueHead++];
     if (!item) return;
 
-    // Periodically reset queue to prevent unbounded growth
     if (this.queueHead > 1000 && this.queueHead >= this.queue.length) {
       this.queue = [];
       this.queueHead = 0;
@@ -402,9 +393,7 @@ class WorkerPool<T> {
       // Errors handled in processor
     } finally {
       this.activeCount--;
-      // Immediately try next
       this.tryProcess();
-      // Check if drained
       if (this.activeCount === 0 && this.queueHead >= this.queue.length && this.drainResolver) {
         this.drainResolver();
         this.drainResolver = null;
@@ -419,7 +408,7 @@ class WorkerPool<T> {
 
   stop(): void {
     this.stopped = true;
-    this.queue = []; // Clear for GC
+    this.queue = [];
     this.queueHead = 0;
   }
 
@@ -436,7 +425,6 @@ class WorkerPool<T> {
 // Discovery - Fast API checking
 // ============================================================================
 
-// Diagnostic counters for debugging
 let discoveryStats = {
   total: 0,
   ok: 0,
@@ -448,14 +436,13 @@ let discoveryStats = {
   lastLogTime: Date.now(),
 };
 
-// Early termination detector for negative signals
 class NegativeSignalDetector {
   private consecutiveTimeouts = 0;
   private consecutiveNetErrors = 0;
   private rateLimitCount = 0;
-  private readonly timeoutThreshold = 30; // After 30 consecutive timeouts
-  private readonly netErrorThreshold = 15; // After 15 consecutive network errors
-  private readonly rateLimitThreshold = 5; // After 5 rate limits
+  private readonly timeoutThreshold = 30;
+  private readonly netErrorThreshold = 15;
+  private readonly rateLimitThreshold = 5;
 
   recordTimeout(): boolean {
     this.consecutiveNetErrors = 0;
@@ -463,7 +450,7 @@ class NegativeSignalDetector {
 
     if (this.consecutiveTimeouts >= this.timeoutThreshold) {
       logger.error(`[NegativeSignal] ${this.consecutiveTimeouts} consecutive timeouts - network appears degraded`);
-      return true; // Signal to abort
+      return true;
     }
     return false;
   }
@@ -474,7 +461,7 @@ class NegativeSignalDetector {
 
     if (this.consecutiveNetErrors >= this.netErrorThreshold) {
       logger.error(`[NegativeSignal] ${this.consecutiveNetErrors} consecutive network errors - connectivity issue`);
-      return true; // Signal to abort
+      return true;
     }
     return false;
   }
@@ -484,7 +471,7 @@ class NegativeSignalDetector {
 
     if (this.rateLimitCount >= this.rateLimitThreshold) {
       logger.error(`[NegativeSignal] ${this.rateLimitCount} rate limit responses - being throttled`);
-      return true; // Signal to abort
+      return true;
     }
     return false;
   }
@@ -492,7 +479,6 @@ class NegativeSignalDetector {
   recordSuccess(): void {
     this.consecutiveTimeouts = 0;
     this.consecutiveNetErrors = 0;
-    // Don't reset rate limit count - it persists across successes
   }
 
   shouldAbort(): boolean {
@@ -506,17 +492,14 @@ const negativeSignalDetector = new NegativeSignalDetector();
 
 function logDiscoveryStats() {
   const now = Date.now();
-  if (now - discoveryStats.lastLogTime > 5000) { // Log every 5 seconds
-    // Use warn level to ensure it shows in production
+  if (now - discoveryStats.lastLogTime > 5000) {
     logger.warn(`[Discovery Stats] Total: ${discoveryStats.total}, OK: ${discoveryStats.ok}, 404: ${discoveryStats.notFound}, Other: ${discoveryStats.otherStatus}, Timeout: ${discoveryStats.timeout}, NetErr: ${discoveryStats.networkError}, Invalid: ${discoveryStats.invalidData}`);
     discoveryStats.lastLogTime = now;
   }
 }
 
 async function checkCode(code: number): Promise<Candidate | null> {
-  // Use abort controller for timeout management with Axios
   const controller = new AbortController();
-  // Add a buffer to the timeout, using adaptive timeout based on pre-flight measurements
   const timeoutId = setTimeout(() => controller.abort(), adaptiveTimeout + 500);
 
   discoveryStats.total++;
@@ -526,7 +509,6 @@ async function checkCode(code: number): Promise<Candidate | null> {
       signal: controller.signal
     });
 
-    // Check for rate limiting
     if (response.status === 429 || response.status === 403) {
       discoveryStats.otherStatus++;
       const shouldAbort = negativeSignalDetector.recordRateLimit();
@@ -540,10 +522,9 @@ async function checkCode(code: number): Promise<Candidate | null> {
     if (response.status !== 200) {
       if (response.status === 404) {
         discoveryStats.notFound++;
-        negativeSignalDetector.recordSuccess(); // 404 is expected, not a failure
+        negativeSignalDetector.recordSuccess();
       } else {
         discoveryStats.otherStatus++;
-        // Log unusual status codes
         if (discoveryStats.otherStatus <= 10) {
           logger.warn(`[Discovery] Code ${code} returned status ${response.status}`);
         }
@@ -557,7 +538,20 @@ async function checkCode(code: number): Promise<Candidate | null> {
     const data = response.data;
     if (data.presenterEmail && data.cpcsRegion) {
       logDiscoveryStats();
-      return { code, presenterEmail: data.presenterEmail, cpcsRegion: data.cpcsRegion };
+
+      const schoolName = 
+        data.schoolName || 
+        data.school || 
+        data.organizationName || 
+        data.organization?.name ||
+        undefined;
+
+      return { 
+        code, 
+        presenterEmail: data.presenterEmail, 
+        cpcsRegion: data.cpcsRegion,
+        school: schoolName ? String(schoolName).trim() : undefined
+      };
     }
     discoveryStats.invalidData++;
     logDiscoveryStats();
@@ -574,7 +568,6 @@ async function checkCode(code: number): Promise<Candidate | null> {
       if (shouldAbort) {
         logger.error(`[Discovery] Network error threshold exceeded - connectivity problems detected`);
       }
-      // Log first few network errors
       if (discoveryStats.networkError <= 5) {
         logger.warn(`[Discovery] Network error for code ${code}:`, error);
       }
@@ -586,7 +579,6 @@ async function checkCode(code: number): Promise<Candidate | null> {
   return null;
 }
 
-// Export for debugging
 export function getDiscoveryStats() {
   return { ...discoveryStats };
 }
@@ -602,12 +594,11 @@ export function resetDiscoveryStats() {
     invalidData: 0,
     lastLogTime: Date.now(),
   };
-  // Reset negative signal detector
   negativeSignalDetector.recordSuccess();
 }
 
 // ============================================================================
-// Validation - WebSocket with early exit
+// Validation
 // ============================================================================
 
 async function validateCandidate(candidate: Candidate): Promise<boolean> {
@@ -617,7 +608,6 @@ async function validateCandidate(candidate: Candidate): Promise<boolean> {
   const username = generateUsername(DEFAULT_NAME_PREFIX);
   const participantId = generateParticipantId();
 
-  // Quick pre-validation
   const validateUrl = API_ENDPOINTS.VALIDATE_JOIN_URL(
     candidate.cpcsRegion,
     candidate.presenterEmail,
@@ -634,7 +624,7 @@ async function validateCandidate(candidate: Candidate): Promise<boolean> {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
       signal: controller.signal,
-      keepalive: true, // Enable connection reuse for validation requests
+      keepalive: true,
     });
     
     if (!validateResponse.ok) return false;
@@ -642,20 +632,18 @@ async function validateCandidate(candidate: Candidate): Promise<boolean> {
     return false;
   }
 
-  // WebSocket validation with early exit
   let connection: ReturnType<typeof HubConnectionBuilder.prototype.build> | null = null;
   
   try {
     connection = new HubConnectionBuilder()
       .withUrl(url, { transport: HttpTransportType.WebSockets, withCredentials: true })
-      .configureLogging(LogLevel.None)  // Silence for performance
+      .configureLogging(LogLevel.None)
       .build();
 
     let isInSlideshow = false;
     let resolved = false;
 
     const resultPromise = new Promise<boolean>((resolve) => {
-      // Early exit: resolve as soon as we get the event
       connection!.on("SendJoinClass", (data: SendJoinClassPayload) => {
         if (!resolved) {
           resolved = true;
@@ -664,7 +652,6 @@ async function validateCandidate(candidate: Candidate): Promise<boolean> {
         }
       });
 
-      // Timeout fallback
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
@@ -709,7 +696,7 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 // ============================================================================
-// Main Scanner - Parallel Streaming
+// Main Scanner
 // ============================================================================
 
 export async function startScanIfNotRunning(
@@ -718,7 +705,6 @@ export async function startScanIfNotRunning(
   end: number = SCANNER_CONFIG.END_CODE,
   options: { resume?: boolean } = {}
 ): Promise<{ started: boolean; error?: string }> {
-  // Run network diagnostics first
   const isHealthy = await runPreFlightCheck();
   if (!isHealthy) {
      return { started: false, error: "Network check FAILED. Server appears blocked or has no connectivity. Check logs." };
@@ -765,10 +751,8 @@ export async function startScanIfNotRunning(
   session.remainingCodes = [...codesToScan];
   session.interruptedAt = null;
 
-  // Run scan in background with parallel pools
   (async () => {
     try {
-      // Validation pool - processes candidates as they arrive
       const validationPool = new WorkerPool<Candidate>(
         SCANNER_CONFIG.VALIDATION_CONCURRENCY,
         async (candidate) => {
@@ -781,14 +765,14 @@ export async function startScanIfNotRunning(
             session.foundCodes.push({
               code: candidate.code,
               email: candidate.presenterEmail,
+              school: candidate.school,
               foundAt: new Date(),
-            });
+            } as ValidClassCode);
             logger.info(`✓ Confirmed: ${candidate.code} (${candidate.presenterEmail})`);
           }
         }
       );
 
-      // Discovery pool - finds candidates and feeds validation pool
       const discoveryPool = new WorkerPool<number>(
         SCANNER_CONFIG.DISCOVERY_CONCURRENCY,
         async (code) => {
@@ -797,36 +781,28 @@ export async function startScanIfNotRunning(
           session.currentCode = code;
           session.scannedCount++;
           
-          // Update remaining codes for resume
           const idx = session.remainingCodes.indexOf(code);
           if (idx > -1) session.remainingCodes.splice(idx, 1);
           
           const candidate = await checkCode(code);
           
           if (candidate) {
-            // Check domain filter
             if (SCANNER_CONFIG.COLLECT_ONLY_DOMAIN && 
                 !candidate.presenterEmail.includes(SCANNER_CONFIG.COLLECT_ONLY_DOMAIN)) {
               return;
             }
             
             session.candidateCount++;
-            // Immediately queue for validation (parallel processing)
             validationPool.push(candidate);
           }
         }
       );
 
-      // Feed all codes to discovery pool
       discoveryPool.pushMany(codesToScan);
 
-      // Wait for discovery to complete
       await discoveryPool.drain();
-      
-      // Wait for remaining validations
       await validationPool.drain();
 
-      // Mark remaining codes as empty if completed successfully
       if (!session.shouldStop) {
         session.remainingCodes = [];
       }
